@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Người dùng</title>
+    <!-- React CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            margin-bottom: 15px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        /* Buttons */
+        button {
+            padding: 8px 16px;
+            margin: 0 4px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const API_URL = "http://localhost:3001/api/users";
+
+        function App() {
+            // States
+            const [users, setUsers] = React.useState([]);
+            const [page, setPage] = React.useState(1);
+            const [limit, setLimit] = React.useState(5);
+            const [search, setSearch] = React.useState("");
+            const [total, setTotal] = React.useState(0);
+            const [totalPages, setTotalPages] = React.useState(0);
+            const [showModal, setShowModal] = React.useState(false);
+            const [editingUser, setEditingUser] = React.useState(null);
+
+            // Fetch users
+            const fetchUsers = () => {
+                const url = `${API_URL}?page=${page}&limit=${limit}&search=${search}`;
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => {
+                        setUsers(data.data);
+                        setTotal(data.total);
+                        setTotalPages(data.totalPages);
+                    })
+                    .catch(err => console.error("Fetch error:", err));
+            };
+
+            // Delete user
+            const deleteUser = async (id) => {
+                if (!confirm("Bạn có chắc muốn xóa người dùng này?")) return;
+
+                try {
+                    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+                    fetchUsers();
+                } catch (err) {
+                    console.error("Delete error:", err);
+                }
+            };
+
+            // useEffect: Gọi API khi page, limit, search thay đổi
+            React.useEffect(() => {
+                fetchUsers();
+            }, [page, limit, search]);
+
+            return (
+                <div className="container">
+                    <h1>Quản lý Người dùng</h1>
+                    <SearchBar value={search} onChange={setSearch} />
+                    <button className="btn" onClick={() => { setEditingUser(null); setShowModal(true); }}>
+                        Thêm người dùng
+                    </button>
+                    <UserTable
+                        users={users}
+                        onEdit={(user) => { setEditingUser(user); setShowModal(true); }}
+                        onDelete={deleteUser}
+                    />
+                    <Pagination
+                        page={page}
+                        totalPages={totalPages}
+                        limit={limit}
+                        onPageChange={setPage}
+                        onLimitChange={setLimit}
+                    />
+                    {showModal && (
+                        <UserModal
+                            user={editingUser}
+                            onClose={() => setShowModal(false)}
+                            onSave={() => { fetchUsers(); setShowModal(false); }}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function SearchBar({ value, onChange }) {
+            return (
+                <div className="search-bar">
+                    <input
+                        type="text"
+                        placeholder="Tìm theo tên, email, địa chỉ..."
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                    />
+                </div>
+            );
+        }
+
+        function UserTable({ users, onEdit, onDelete }) {
+            return (
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th>Tên</th>
+                            <th>Email</th>
+                            <th>Tuổi</th>
+                            <th>Địa chỉ</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {users.map(u => (
+                            <tr key={u._id}>
+                                <td>{u.name}</td>
+                                <td>{u.email}</td>
+                                <td>{u.age}</td>
+                                <td>{u.address}</td>
+                                <td>
+                                    <button
+                                        className="btn"
+                                        onClick={() => onEdit(u)}
+                                    >
+                                        Sửa
+                                    </button>
+                                    &nbsp;
+                                    <button
+                                        className="btn"
+                                        style={{ background: "red" }}
+                                        onClick={() => onDelete(u._id)}
+                                    >
+                                        Xóa
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            );
+        }
+
+        function Pagination({ page, totalPages, onPageChange }) {
+            return (
+                <div className="pagination">
+                    <button
+                        className="btn"
+                        disabled={page <= 1}
+                        onClick={() => onPageChange(page - 1)}
+                    >
+                        Trước
+                    </button>
+                    <span>Trang {page} / {totalPages}</span>
+                    <button
+                        className="btn"
+                        disabled={page >= totalPages}
+                        onClick={() => onPageChange(page + 1)}
+                    >
+                        Sau
+                    </button>
+                </div>
+            );
+        }
+
+        function UserModal({ user, onClose, onSave }) {
+            const [form, setForm] = React.useState(
+                user || { name: "", email: "", age: "", address: "" }
+            );
+
+            function updateField(k, v) {
+                setForm({ ...form, [k]: v });
+            }
+
+            async function save() {
+                try {
+                    if (user) {
+                        // UPDATE
+                        await fetch(`${API_URL}/${user._id}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(form)
+                        });
+                    } else {
+                        // ADD NEW
+                        await fetch(API_URL, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(form)
+                        });
+                    }
+                    onSave();
+                } catch (err) {
+                    console.error("Save error:", err);
+                }
+            }
+
+            return (
+                <div className="modal">
+                    <h3>{user ? "Sửa người dùng" : "Thêm người dùng"}</h3>
+
+                    <input
+                        placeholder="Tên"
+                        value={form.name}
+                        onChange={(e) => updateField("name", e.target.value)}
+                    />
+
+                    <input
+                        placeholder="Email"
+                        value={form.email}
+                        onChange={(e) => updateField("email", e.target.value)}
+                    />
+
+                    <input
+                        placeholder="Tuổi"
+                        type="number"
+                        value={form.age}
+                        onChange={(e) => updateField("age", e.target.value)}
+                    />
+
+                    <input
+                        placeholder="Địa chỉ"
+                        value={form.address}
+                        onChange={(e) => updateField("address", e.target.value)}
+                    />
+
+                    <button className="btn" onClick={save}>Lưu</button>
+                    &nbsp;
+                    <button className="btn" style={{ background: "gray" }} onClick={onClose}>
+                        Hủy
+                    </button>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+</body>
+
+</html>
